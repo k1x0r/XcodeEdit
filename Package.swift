@@ -6,8 +6,11 @@ let package = Package(
   products: [
     .library(name: "XcodeEdit", targets: ["XcodeEdit"]),
   ],
+  dependencies: [
+    .package(url: "https://git.lan/k2utils.git", from: "0.0.0"),
+  ],
   targets: [
-    .target(name: "XcodeEdit"),
+    .target(name: "XcodeEdit", dependencies: ["k2Utils"]),
   ],
   swiftLanguageVersions: [4]
 )

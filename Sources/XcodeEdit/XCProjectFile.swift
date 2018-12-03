@@ -50,15 +50,16 @@ public class XCProjectFile {
   let fields: Fields
   var format: PropertyListSerialization.PropertyListFormat
   let allObjects = AllObjects()
+  var xcodeprojURL : URL
 
   public convenience init(xcodeprojURL: URL, ignoreReferenceErrors: Bool = false) throws {
     let pbxprojURL = xcodeprojURL.appendingPathComponent("project.pbxproj", isDirectory: false)
     let data = try Data(contentsOf: pbxprojURL)
-
-    try self.init(propertyListData: data, ignoreReferenceErrors: ignoreReferenceErrors)
+    try self.init(xcodeprojURL: xcodeprojURL, propertyListData: data, ignoreReferenceErrors: ignoreReferenceErrors)
+    
   }
 
-  public convenience init(propertyListData data: Data, ignoreReferenceErrors: Bool = false) throws {
+  public convenience init(xcodeprojURL: URL, propertyListData data: Data, ignoreReferenceErrors: Bool = false) throws {
 
     let options = PropertyListSerialization.MutabilityOptions()
     var format: PropertyListSerialization.PropertyListFormat = PropertyListSerialization.PropertyListFormat.binary
@@ -67,12 +68,11 @@ public class XCProjectFile {
     guard let fields = obj as? Fields else {
       throw ProjectFileError.invalidData
     }
-
-    try self.init(fields: fields, format: format, ignoreReferenceErrors: ignoreReferenceErrors)
+    try self.init(xcodeprojURL: xcodeprojURL, fields: fields, format: format, ignoreReferenceErrors: ignoreReferenceErrors)
   }
 
-  private init(fields: Fields, format: PropertyListSerialization.PropertyListFormat, ignoreReferenceErrors: Bool = false) throws {
-
+  private init(xcodeprojURL : URL, fields: Fields, format: PropertyListSerialization.PropertyListFormat, ignoreReferenceErrors: Bool = false) throws {
+    self.xcodeprojURL = xcodeprojURL
     guard let objects = fields["objects"] as? [String: Fields] else {
       throw AllObjectsError.wrongType(key: "objects")
     }
@@ -113,12 +113,17 @@ public class XCProjectFile {
 
     return String(last[..<range.lowerBound])
   }
-
+  
+    public func addXibsAndStoryboards() throws {
+        try project.addXibsAndStoryboards(rootPath: xcodeprojURL.deletingLastPathComponent())
+    }
+    
   private func paths(_ current: PBXGroup, prefix: String) -> [Guid: Path] {
 
     var ps: [Guid: Path] = [:]
 
-    let fileRefs = current.fileRefs.compactMap { $0.value }
+    let fileRefs = current.fileRefs.compactMap { $0.value } +
+                   current.subGroups.compactMap { $0.value }
     for file in fileRefs {
       guard let path = file.path else { continue }
 

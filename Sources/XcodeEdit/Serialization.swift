@@ -10,20 +10,23 @@ import Foundation
 
 extension XCProjectFile {
 
-  public func write(to url: URL, format: PropertyListSerialization.PropertyListFormat? = nil) throws {
-
+  public func write(to toUrl: URL? = nil, format: PropertyListSerialization.PropertyListFormat? = nil) throws {
+    let url = toUrl ?? xcodeprojURL
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
 
     let name = try XCProjectFile.projectName(from: url)
     let path = url.appendingPathComponent("project.pbxproj", isDirectory: false)
-
+    
+    for (_, obj) in project.allObjects.objects {
+        obj.applyChanges()
+    }
+    
     let serializer = Serializer(projectName: name, projectFile: self)
     let plformat = format ?? self.format
 
     if plformat == PropertyListSerialization.PropertyListFormat.openStep {
       try serializer.openStepSerialization.write(to: path, atomically: true, encoding: String.Encoding.utf8)
-    }
-    else {
+    } else {
       let data = try PropertyListSerialization.data(fromPropertyList: fields, format: plformat, options: 0)
       try data.write(to: path)
     }

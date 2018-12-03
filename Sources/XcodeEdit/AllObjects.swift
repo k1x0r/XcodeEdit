@@ -25,6 +25,10 @@ public struct Guid : Hashable, Comparable {
   public init(_ value: String) {
     self.value = value
   }
+    
+  public static var random : Guid {
+     return Guid(UUID().uuidString)
+  }
 
   static public func ==(lhs: Guid, rhs: Guid) -> Bool {
     return lhs.value == rhs.value
@@ -77,6 +81,16 @@ public class AllObjects {
     return ids.map(createReference)
   }
 
+  internal func createReferences<Value>() -> [Reference<Value>] where Value : PBXObject {
+    return objects.compactMap { (key, value) -> Reference<Value>? in
+        guard value is Value else {
+            return nil
+        }
+        refCounts[key, default: 0] += 1
+        return Reference(allObjects: self, id: key)
+    }
+  }
+    
   internal func createOptionalReference<Value>(id: Guid?) -> Reference<Value>? {
     guard let id = id else { return nil }
     return createReference(id: id)
@@ -223,28 +237,37 @@ private func findGuids(_ obj: Any) -> [(String, Guid)] {
   return result
 }
 
+protocol OverrideIsaName : class {
+    static var overrideIsaName : String { get }
+}
 
-private let types: [String: PBXObject.Type] = [
-  "PBXProject": PBXProject.self,
-  "PBXContainerItemProxy": PBXContainerItemProxy.self,
-  "PBXBuildFile": PBXBuildFile.self,
-  "PBXCopyFilesBuildPhase": PBXCopyFilesBuildPhase.self,
-  "PBXFrameworksBuildPhase": PBXFrameworksBuildPhase.self,
-  "PBXHeadersBuildPhase": PBXHeadersBuildPhase.self,
-  "PBXResourcesBuildPhase": PBXResourcesBuildPhase.self,
-  "PBXShellScriptBuildPhase": PBXShellScriptBuildPhase.self,
-  "PBXSourcesBuildPhase": PBXSourcesBuildPhase.self,
-  "PBXBuildStyle": PBXBuildStyle.self,
-  "XCBuildConfiguration": XCBuildConfiguration.self,
-  "PBXAggregateTarget": PBXAggregateTarget.self,
-  "PBXLegacyTarget": PBXLegacyTarget.self,
-  "PBXNativeTarget": PBXNativeTarget.self,
-  "PBXTargetDependency": PBXTargetDependency.self,
-  "XCConfigurationList": XCConfigurationList.self,
-  "PBXReference": PBXReference.self,
-  "PBXReferenceProxy": PBXReferenceProxy.self,
-  "PBXFileReference": PBXFileReference.self,
-  "PBXGroup": PBXGroup.self,
-  "PBXVariantGroup": PBXVariantGroup.self,
-  "XCVersionGroup": XCVersionGroup.self
+let xcObjectTypes = [
+    PBXProject.self,
+    PBXContainerItemProxy.self,
+    PBXBuildFile.self,
+    PBXCopyFilesBuildPhase.self,
+    PBXFrameworksBuildPhase.self,
+    PBXHeadersBuildPhase.self,
+    PBXResourcesBuildPhase.self,
+    PBXShellScriptBuildPhase.self,
+    PBXSourcesBuildPhase.self,
+    PBXBuildStyle.self,
+    XCBuildConfiguration.self,
+    PBXAggregateTarget.self,
+    PBXLegacyTarget.self,
+    PBXNativeTarget.self,
+    PBXTargetDependency.self,
+    XCConfigurationList.self,
+    PBXReference.self,
+    PBXReferenceProxy.self,
+    PBXFileReference.self,
+    PBXGroup.self,
+    PBXVariantGroup.self,
+    XCVersionGroup.self
 ]
+
+
+
+private let types: [String: PBXObject.Type] = Dictionary(uniqueKeysWithValues: xcObjectTypes.map({ ( $0.isaName , $0 ) }))
+
+
