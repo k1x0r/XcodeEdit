@@ -10,9 +10,16 @@ import Foundation
 
 public typealias Fields = [String: Any]
 
-public /* abstract */ class PBXObject {
+public protocol PBXObjectProtocol : class {
+    var fields: Fields { get }
+    var allObjects: AllObjects { get }
+    init(id: Guid, fields: Fields, allObjects: AllObjects) throws
+    func applyChanges()
+}
+
+public /* abstract */ class PBXObject : PBXObjectProtocol {
     
-  internal var fields: Fields
+  public var fields: Fields
   public let allObjects: AllObjects
     
   public let id: Guid
@@ -41,18 +48,28 @@ public /* abstract */ class PBXObject {
   }
 }
 
+public extension PBXObjectProtocol {
+    
+    func clone() -> Self {
+        applyChanges()
+        return try! type(of: self).init(id: Guid.random, fields: fields, allObjects: allObjects)
+    }
+    
+}
+
+
 public /* abstract */ class PBXContainer : PBXObject {
 }
 
 public class PBXProject : PBXContainer {
-  public let buildConfigurationList: Reference<XCConfigurationList>
-  public let developmentRegion: String
-  public let hasScannedForEncodings: Bool
-  public let knownRegions: [String]
-  public let mainGroup: Reference<PBXGroup>
-  public let targets: [Reference<PBXTarget>]
-  public let projectReferences: [ProjectReference]?
-  public let groups : [Reference<PBXGroup>]
+  public var buildConfigurationList: Reference<XCConfigurationList>
+  public var developmentRegion: String
+  public var hasScannedForEncodings: Bool
+  public var knownRegions: [String]
+  public var mainGroup: Reference<PBXGroup>
+  public var targets: [Reference<PBXTarget>]
+  public var projectReferences: [ProjectReference]
+  public var groups : [Reference<PBXGroup>]
     
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     self.developmentRegion = try fields.string("developmentRegion")
@@ -65,7 +82,7 @@ public class PBXProject : PBXContainer {
     self.groups = allObjects.createReferences()
     
     if fields["projectReferences"] == nil {
-      self.projectReferences = nil
+      self.projectReferences = []
     }
     else {
       let projectReferenceFields = try fields.fieldsArray("projectReferences")
@@ -78,6 +95,15 @@ public class PBXProject : PBXContainer {
     
     required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
         fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+    }
+    
+    public override func applyChanges() {
+        super.applyChanges()
+        fields["targets"] = targets.map { $0.id.value }
+        fields["buildConfigurationList"] = buildConfigurationList.id.value
+        fields["mainGroup"] = mainGroup.id.value
+        print("Changes applied...")
+        
     }
     
   public class ProjectReference {
@@ -151,6 +177,7 @@ public /* abstract */ class PBXBuildPhase : PBXProjectItem {
      super.applyChanges()
      fields["files"] = files.map { $0.id.value }
   }
+  
 }
 
 public class PBXCopyFilesBuildPhase : PBXBuildPhase {
@@ -287,10 +314,18 @@ public class PBXLegacyTarget : PBXTarget {
 }
 
 public class PBXNativeTarget : PBXTarget {
+    
+    public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
+        try super.init(id: id, fields: fields, allObjects: allObjects)
+    }
+    
+    required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
+        fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+    }
 }
 
 public class PBXTargetDependency : PBXProjectItem {
-  public let targetProxy: Reference<PBXContainerItemProxy>?
+  public var targetProxy: Reference<PBXContainerItemProxy>?
 
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     do {
@@ -302,8 +337,13 @@ public class PBXTargetDependency : PBXProjectItem {
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
-    required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
-        fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+   public required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
+       super.init(emptyObjectWithId: id, allObjects: allObjects)
+   }
+    
+    public override func applyChanges() {
+        super.applyChanges()
+        fields["targetProxy"] = targetProxy?.id.value
     }
     
 }
@@ -347,8 +387,18 @@ public class XCConfigurationList : PBXProjectItem {
     
     public override func applyChanges() {
         super.applyChanges()
-
         fields["buildConfigurations"] = buildConfigurations.map { $0.id.value }
+    }
+    
+    public func deepClone() -> XCConfigurationList {
+        let aClone = clone()
+        aClone.buildConfigurations = buildConfigurations.compactMap({
+            guard let cloneDependency = $0.value?.clone() else {
+                return nil
+            }
+            return allObjects.createReference(value: cloneDependency)
+        })
+        return aClone
     }
     
 }
@@ -440,7 +490,7 @@ public class PBXGroup : PBXReference {
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
-  required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
+  public required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
       self.children = []
       super.init(emptyObjectWithId: id, allObjects: allObjects)
   }
@@ -458,14 +508,19 @@ public class PBXGroup : PBXReference {
       return Reference(allObjects: childRef.allObjects, id: childRef.id)
     }
   }
+    
+    public func addChildGroup(_ groupRef: Reference<PBXGroup>) {
+        let reference = Reference<PBXReference>(allObjects: groupRef.allObjects, id: groupRef.id)
+        children.append(reference)
+    }
 
   // Custom function for R.swift
   public func addFileReference(_ fileReference: Reference<PBXFileReference>) {
     if fileRefs.contains(fileReference) { return }
     let reference = Reference<PBXReference>(allObjects: fileReference.allObjects, id: fileReference.id)
     children.append(reference)
-
   }
+ 
     
     public override func applyChanges() {
         super.applyChanges()

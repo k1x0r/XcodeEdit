@@ -122,8 +122,7 @@ internal class Serializer {
           lines.append("/* End \(isa) section */")
         }
         lines.append("\t};")
-      }
-      else {
+      } else {
         var comment = "";
         if key == "rootObject" {
           comment = " /* Project object */"

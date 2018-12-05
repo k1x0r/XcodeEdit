@@ -86,7 +86,10 @@ public class XCProjectFile {
       throw AllObjectsError.objectMissing(id: rootObjectId)
     }
 
-    let project = try PBXProject(id: rootObjectId, fields: projectFields, allObjects: allObjects)
+    guard let project = allObjects.objects[rootObjectId] as? PBXProject else {
+        throw "No project object found!".error()
+    }
+        // = try PBXProject(id: rootObjectId, fields: projectFields, allObjects: allObjects)
     guard let mainGroup = project.mainGroup.value else {
       throw AllObjectsError.objectMissing(id: project.mainGroup.id)
     }

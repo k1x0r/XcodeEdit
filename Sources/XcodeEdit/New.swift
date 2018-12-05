@@ -54,24 +54,42 @@ public extension PBXProject {
         case both
     }
     
-    func addFramework(framework : PBXFileReference, frameworkType : FrameworkType, group groupRef: Reference<PBXGroup>? = nil, targetNames: [String]) throws {
+    func addSourceFiles(files : [Reference<PBXReference>], group groupRef: Reference<PBXGroup>? = nil, targets: [PBXTarget]) throws {
+        guard let group = (groupRef ?? mainGroup).value else {
+            throw "Main group is not found".error()
+        }
+        group.children.append(contentsOf: files)
+        for target in targets {
+            let buildPhase = target.buildPhase(of: PBXSourcesBuildPhase.self)
+            let buildFiles : [Reference<PBXBuildFile>] = files.map {
+                let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: self.allObjects)
+                buildFile.fileRef = $0
+                return allObjects.createReference(value: buildFile)
+            }
+            buildPhase.files.append(contentsOf: buildFiles)
+
+        }
+
+    }
+    
+    func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targetNames: [(FrameworkType, String)]) throws {
         
-        try addFramework(framework: framework, frameworkType: frameworkType, group: groupRef, targets: targetNames.map {
-            guard let targ = target(named: $0) else {
+        try addFramework(framework: framework, group: groupRef, targets: targetNames.map {
+            guard let targ = target(named: $0.1) else {
                 throw "Target with name: \"\($0)\" not found!".error()
             }
-            return targ
+            return ($0.0, targ)
         })
         
     }
     
-    func addFramework(framework : PBXFileReference, frameworkType : FrameworkType, group groupRef: Reference<PBXGroup>? = nil, targets: [PBXTarget]) throws{
+    func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targets: [(FrameworkType, PBXTarget)]) throws{
         guard let group = (groupRef ?? mainGroup).value else {
             throw "Main group is not found".error()
         }
         group.addFileReference(allObjects.createReference(value: framework))
         
-        for target in targets {
+        for (frameworkType, target) in targets {
             switch frameworkType {
                 case .embeddedBinary, .both:
                     let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
@@ -161,11 +179,38 @@ public extension PBXTarget {
         return phase
     }
     
+    func deepClone() throws -> PBXTarget {
+        let aClone = clone()
+        aClone.buildPhases = buildPhases.compactMap({
+            guard let clonePhase = $0.value?.clone() else {
+                return nil
+            }
+            return allObjects.createReference(value: clonePhase)
+        })
+        aClone.dependencies = dependencies.compactMap({
+            guard let cloneDependency = $0.value?.clone() else {
+                return nil
+            }
+            return allObjects.createReference(value: cloneDependency)
+        })
+        guard let buildConfigClone = buildConfigurationList.value?.deepClone() else {
+            throw "Build configurations not found".error()
+        }
+        aClone.buildConfigurationList = allObjects.createReference(value: buildConfigClone)
+        return aClone
+    }
+    
     /// Only used for singular setting
     /// Does not guarantee anything
     func setBuildSetting(key: String, value : Any) {
         for ref in buildConfigurationList.value?.buildConfigurations ?? [] {
             ref.value?.buildSettings[key] = value
+        }
+    }
+    
+    func updateBuildSettings(_ dict : [String : Any]) {
+        for ref in buildConfigurationList.value?.buildConfigurations ?? [] {
+            ref.value?.buildSettings.merge(dict, uniquingKeysWith: { $1 })
         }
     }
     

@@ -44,11 +44,11 @@ public struct Guid : Hashable, Comparable {
 }
 
 public struct Reference<Value : PBXObject> : Hashable, Comparable {
-  internal let allObjects: AllObjects
+  public let allObjects: AllObjects
 
   public let id: Guid
 
-  internal init(allObjects: AllObjects, id: Guid) {
+  public init(allObjects: AllObjects, id: Guid) {
     self.allObjects = allObjects
     self.id = id
   }
@@ -73,15 +73,15 @@ public struct Reference<Value : PBXObject> : Hashable, Comparable {
 }
 
 public class AllObjects {
-  internal var objects: [Guid: PBXObject] = [:]
-  internal var fullFilePaths: [Guid: Path] = [:]
-  internal var refCounts: [Guid: Int] = [:]
+  public var objects: [Guid: PBXObject] = [:]
+  public var fullFilePaths: [Guid: Path] = [:]
+  public var refCounts: [Guid: Int] = [:]
 
-  internal func createReferences<Value>(ids: [Guid]) -> [Reference<Value>] {
+  public func createReferences<Value>(ids: [Guid]) -> [Reference<Value>] {
     return ids.map(createReference)
   }
 
-  internal func createReferences<Value>() -> [Reference<Value>] where Value : PBXObject {
+  public func createReferences<Value>() -> [Reference<Value>] where Value : PBXObject {
     return objects.compactMap { (key, value) -> Reference<Value>? in
         guard value is Value else {
             return nil
@@ -91,19 +91,19 @@ public class AllObjects {
     }
   }
     
-  internal func createOptionalReference<Value>(id: Guid?) -> Reference<Value>? {
+  public func createOptionalReference<Value>(id: Guid?) -> Reference<Value>? {
     guard let id = id else { return nil }
     return createReference(id: id)
   }
 
-  internal func createReference<Value>(id: Guid) -> Reference<Value> {
+  public func createReference<Value>(id: Guid) -> Reference<Value> {
     refCounts[id, default: 0] += 1
 
     let ref: Reference<Value> = Reference(allObjects: self, id: id)
     return ref
   }
 
-  internal func createReference<Value>(value: Value) -> Reference<Value> {
+  public func createReference<Value>(value: Value) -> Reference<Value> {
     refCounts[value.id, default: 0] += 1
 
     objects[value.id] = value
@@ -111,7 +111,7 @@ public class AllObjects {
     return ref
   }
 
-  internal func removeReference<Value>(_ ref: Reference<Value>?) {
+  public func removeReference<Value>(_ ref: Reference<Value>?) {
     guard let ref = ref else { return }
     guard let count = refCounts[ref.id], count > 0 else {
       assertionFailure("refCount[\(ref.id)] is \(refCounts[ref.id]?.description ?? "nil")")
@@ -125,7 +125,7 @@ public class AllObjects {
     }
   }
 
-  internal func createFreshGuid(from original: Guid) -> Guid {
+  public func createFreshGuid(from original: Guid) -> Guid {
     // If original isn't a PBXIdentifier, just return a UUID
     guard let identifier = PBXIdentifier(string: original.value) else {
       return Guid(UUID().uuidString)
@@ -146,7 +146,7 @@ public class AllObjects {
     return Guid(UUID().uuidString)
   }
 
-  internal static func createObject(_ id: Guid, fields: Fields, allObjects: AllObjects) throws -> PBXObject {
+  public static func createObject(_ id: Guid, fields: Fields, allObjects: AllObjects) throws -> PBXObject {
     let isa = try fields.string("isa")
     if let type = types[isa] {
       return try type.init(id: id, fields: fields, allObjects: allObjects)
@@ -157,7 +157,7 @@ public class AllObjects {
     return try PBXObject(id: id, fields: fields, allObjects: allObjects)
   }
 
-  internal func validateReferences() throws {
+  public func validateReferences() throws {
 
     let refKeys = Set(refCounts.keys)
     let objKeys = Set(objects.keys)
