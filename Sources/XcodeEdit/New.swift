@@ -84,10 +84,10 @@ public extension PBXProject {
     }
     
     func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targets: [(FrameworkType, PBXTarget)]) throws{
-        guard let group = (groupRef ?? mainGroup).value else {
-            throw "Main group is not found".error()
+        framework.lastKnownFileType = .framework
+        if let group = groupRef?.value {
+            group.addFileReference(allObjects.createReference(value: framework))
         }
-        group.addFileReference(allObjects.createReference(value: framework))
         
         for (frameworkType, target) in targets {
             switch frameworkType {
@@ -137,7 +137,12 @@ public extension PBXProject {
             }
             phase.files = phase.files.filter({ !buildFileRefs.contains($0) })
         }
-
+        allObjects.objects = allObjects.objects.filter({ (key, value) in
+            guard let fileRef = value as? PBXReference else {
+                return true
+            }
+            return !frameworks.contains(where: { $0.id == fileRef.id })
+        })
     }
     
     
@@ -154,13 +159,37 @@ public extension PBXProject {
         framework.lastKnownFileType = .framework
         return framework
     }
-    
+
+    func newFileReference(name: String? = nil, path: String, sourceTree: SourceTree = .group) -> Reference<PBXReference> {
+        let fileReference = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
+        fileReference.path = path
+        fileReference.name = name ?? path.substring(fromLast: "/") ?? path
+        fileReference.sourceTree = sourceTree
+        let ref = allObjects.createReference(value: fileReference)
+        return Reference(allObjects: fileReference.allObjects, id: ref.id)
+    }
 }
 
 public extension PBXGroup {
     
     var frameworks : Set<Reference<PBXReference>> {
         return Set(fileRefs.filter({ $0.value?.lastKnownFileType == .framework }).map({ Reference<PBXReference>(allObjects: allObjects, id: $0.id) }))
+    }
+    
+    func group(with name: String, sourceTree : SourceTree = .group) -> Reference<PBXGroup> {
+        let group : Reference<PBXGroup>
+        if let _group = subGroups.first(where: { $0.value?.path == name }) {
+            group = _group
+        } else {
+            let newGroup = PBXGroup(emptyObjectWithId: Guid.random, allObjects: allObjects)
+            newGroup.path = name
+            newGroup.name = name
+            newGroup.sourceTree = sourceTree
+            let newGroupRef = allObjects.createReference(value: newGroup)
+            addChildGroup(newGroupRef)
+            group = newGroupRef
+        }
+        return group
     }
     
 }
@@ -180,7 +209,7 @@ public extension PBXTarget {
     }
     
     func deepClone() throws -> PBXTarget {
-        let aClone = clone()
+        let aClone : PBXTarget = clone()
         aClone.buildPhases = buildPhases.compactMap({
             guard let clonePhase = $0.value?.clone() else {
                 return nil
@@ -230,6 +259,22 @@ public extension Dictionary where Key == String, Value == Any {
         }
         values.append(contentsOf: newValues)
         self[key] = values
+    }
+    
+}
+
+public struct PBXReferenceKey : Hashable {
+    
+    let path : String?
+    let name : String?
+    let sourceTree : SourceTree
+    
+}
+
+public extension PBXReference {
+    
+    var key : PBXReferenceKey {
+        return PBXReferenceKey(path: path, name: name, sourceTree: sourceTree)
     }
     
 }

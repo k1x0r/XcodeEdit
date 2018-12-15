@@ -55,6 +55,10 @@ public extension PBXObjectProtocol {
         return try! type(of: self).init(id: Guid.random, fields: fields, allObjects: allObjects)
     }
     
+    func clone(to newAllObjects: AllObjects, guid : Guid? = nil) -> Self {
+        applyChanges()
+        return try! type(of: self).init(id: guid ?? Guid.random, fields: fields, allObjects: newAllObjects)
+    }
 }
 
 
@@ -291,7 +295,13 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
     }
     
     required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
-        fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+        self.buildConfigurationList = .null(allObjects: allObjects)
+        self.name = ""
+        self.productName = ""
+        self.buildPhases = []
+        self.dependencies = []
+        self.productType = ""
+        super.init(emptyObjectWithId: id, allObjects: allObjects)
     }
     
     public override func applyChanges() {
@@ -331,7 +341,6 @@ public class PBXTargetDependency : PBXProjectItem {
     do {
         self.targetProxy = allObjects.createReference(id: try fields.id("targetProxy"))
     } catch {
-        print("Target proxy error: \(error)")
         self.targetProxy = nil
     }
     try super.init(id: id, fields: fields, allObjects: allObjects)
@@ -351,7 +360,7 @@ public class PBXTargetDependency : PBXProjectItem {
 public class XCConfigurationList : PBXProjectItem {
     
   public var buildConfigurations: [Reference<XCBuildConfiguration>]
-  public let defaultConfigurationName: String?
+  public var defaultConfigurationName: String?
 
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     self.buildConfigurations = allObjects.createReferences(ids: try fields.ids("buildConfigurations"))
@@ -361,7 +370,9 @@ public class XCConfigurationList : PBXProjectItem {
   }
     
     required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
-        fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+        self.buildConfigurations = []
+        self.defaultConfigurationName = ""
+        super.init(emptyObjectWithId: id, allObjects: allObjects)
     }
     
   public func addBuildConfiguration(_ config : XCBuildConfiguration) {
@@ -426,6 +437,7 @@ public class PBXReference : PBXContainerItem {
         sourceTree = .group
         super.init(emptyObjectWithId: id, allObjects: allObjects)
     }
+    
     
     
     public override func applyChanges() {
@@ -547,7 +559,7 @@ public class XCVersionGroup : PBXReference {
 }
 
 
-public enum SourceTree: RawRepresentable {
+public enum SourceTree: RawRepresentable, Hashable {
   case absolute
   case group
   case relativeTo(SourceTreeFolder)

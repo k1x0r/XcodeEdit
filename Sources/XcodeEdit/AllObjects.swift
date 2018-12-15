@@ -52,6 +52,10 @@ public struct Reference<Value : PBXObject> : Hashable, Comparable {
     self.allObjects = allObjects
     self.id = id
   }
+    
+  public static func null(allObjects: AllObjects) -> Reference {
+      return Reference(allObjects: allObjects, id: Guid(""))
+  }
 
   public var value: Value? {
     guard let object = allObjects.objects[id] as? Value else { return nil }
