@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import k2Utils
 
 public typealias Fields = [String: Any]
 
@@ -17,7 +18,7 @@ public protocol PBXObjectProtocol : class {
     func applyChanges()
 }
 
-public /* abstract */ class PBXObject : PBXObjectProtocol {
+public /* abstract */ class PBXObject : PBXObjectProtocol, This {
     
   public var fields: Fields
   public let allObjects: AllObjects
@@ -83,6 +84,7 @@ public class PBXProject : PBXContainer {
     self.buildConfigurationList = allObjects.createReference(id: try fields.id("buildConfigurationList"))
     self.mainGroup = allObjects.createReference(id: try fields.id("mainGroup"))
     self.targets = allObjects.createReferences(ids: try fields.ids("targets"))
+    // Can work not correct...
     self.groups = allObjects.createReferences()
     
     if fields["projectReferences"] == nil {
@@ -219,18 +221,47 @@ public class PBXResourcesBuildPhase : PBXBuildPhase {
 }
 
 public class PBXShellScriptBuildPhase : PBXBuildPhase {
-  public let name: String?
-  public let shellScript: String
+  public var name: String?
+  public var shellScript: String
+  public var inputPaths : [String]
+  public var inputFileListPaths : [String]
+  public var outputFileListPaths : [String]
+  public var outputPaths : [String]
+  public var shellPath : String
 
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     self.name = try fields.optionalString("name")
     self.shellScript = try fields.string("shellScript")
+    self.inputPaths = fields["inputPaths"] as? [String] ?? []
+    self.inputFileListPaths = fields["inputFileListPaths"] as? [String] ?? []
+    self.outputPaths = fields["outputPaths"] as? [String] ?? []
+    self.outputFileListPaths = fields["outputFileListPaths"] as? [String] ?? []
 
+    self.shellPath = try fields.optionalString("shellPath") ?? ""
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
     required public init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
-        fatalError("init(emptyObjectWithId:allObjects:) has not been implemented")
+        self.shellScript = ""
+        self.inputPaths = []
+        self.outputPaths = []
+        self.inputFileListPaths = []
+        self.outputFileListPaths = []
+        self.shellPath = "/bin/sh"
+        super.init(emptyObjectWithId: id, allObjects: allObjects)
+    }
+    
+    public override func applyChanges() {
+        super.applyChanges()
+        fields["runOnlyForDeploymentPostprocessing"] = 0
+        fields["buildActionMask"] = 2147483647
+        fields["shellScript"] = shellScript
+        fields["inputPaths"] = inputPaths
+        fields["outputFileListPaths"] = outputFileListPaths
+        fields["inputFileListPaths"] = inputFileListPaths
+        fields["outputPaths"] = outputPaths
+        fields["shellPath"] = shellPath
+        fields["name"] = name
     }
 }
 

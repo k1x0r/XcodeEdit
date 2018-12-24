@@ -10,41 +10,79 @@ import k2Utils
 
 public extension PBXProject {
     
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings"]
+    
     // TODO remove root path
     func addXibsAndStoryboards(rootPath : URL) throws {
-        for ref in groups {
-            guard let group = ref.value else {
-                continue
-            }
+        print("Adding xibs and storyboards with root url: \(rootPath)")
+        let groups : [PBXGroup] = allObjects.objects.compactMap({
+            $1 as? PBXGroup
+        })
+//        let groupPaths : [(String?, Path?)] = groups.map({
+//            return ($0.name, allObjects.fullFilePaths[$0.id])
+//        })
+//        print("Groups: \(groupPaths)")
+        for group in groups {
             let path = allObjects.fullFilePaths[group.id]
             guard let name = group.name,
                   let url = path?.url(with: { _ in rootPath }),
                   let targ = target(named: name.substring(toLast: " ") ?? name) else {
                 continue
             }
-            
-
-            let files = try FileManager.default.contentsOfDirectory(atPath: url.path).filter {
-                return $0.hasSuffix("storyboard") || $0.hasSuffix("xib")
+            let directoryFiles = try FileManager.default.contentsOfDirectory(atPath: url.path)
+            let resourceFiles = directoryFiles.filter {
+                guard let ext = $0.substring(fromLast: ".") else { return false }
+                return Me.knownTypes.contains(ext)
             }
-            guard !files.isEmpty else {
+            guard !resourceFiles.isEmpty else {
                 continue
             }
-            print("Found files: \(files)")
+            let localizedDirectories = directoryFiles.filter {
+                guard let ext = $0.substring(fromLast: ".") else { return false }
+                return ext == "lproj"
+            }
+            var localized : [String : Set<String>] = [:]
+            for dir in localizedDirectories {
+                let localizedFiles = try FileManager.default.contentsOfDirectory(atPath: url.appendingPathComponent(dir).path)
+                for file in localizedFiles {
+                    guard let ext = file.substring(fromLast: "."), Me.knownTypes.contains(ext) else {
+                        continue
+                    }
+                    localized[file, default: []].insert(dir)
+                }
+            }
+            
+            print("Found files: \(resourceFiles)")
             let resourcesPhase = targ.buildPhase(of: PBXResourcesBuildPhase.self)
-            resourcesPhase.files.append(contentsOf: files.compactMap { fileName in
+            resourcesPhase.files.append(contentsOf: resourceFiles.compactMap { fileName in
                 guard !group.fileRefs.contains(where: { $0.value?.path == fileName }) else {
                     return nil
                 }
                 let reference = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
                 reference.path = fileName
                 reference.fileEncoding = 4
-//                reference.lastKnownFileType =
                 group.addFileReference(allObjects.createReference(value: reference))
                 let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
                 file.fileRef = allObjects.createReference(value: reference)
                 return allObjects.createReference(value: file)
             })
+            resourcesPhase.files.append(contentsOf: localized.map({ (fileName, localizations) in
+                let variantGroup = PBXVariantGroup(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                variantGroup.name = fileName
+                variantGroup.sourceTree = .group
+                variantGroup.children = localizations.map({ localization in
+                    let fileRef = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                    fileRef.sourceTree = .group
+                    fileRef.path = localization + "/" + fileName
+                    fileRef.name = localization.substring(toLast: ".")
+                    return allObjects.createReference(value: fileRef)
+                })
+                let variantRef : Reference<PBXReference> = allObjects.createReference(value: variantGroup)
+                group.children.append(variantRef)
+                let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                buildFile.fileRef = variantRef
+                return allObjects.createReference(value: buildFile)
+            }))
         }
     }
     
@@ -84,7 +122,9 @@ public extension PBXProject {
     }
     
     func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targets: [(FrameworkType, PBXTarget)]) throws{
-        framework.lastKnownFileType = .framework
+        if framework.lastKnownFileType == nil {
+           framework.lastKnownFileType = .framework
+        }
         if let group = groupRef?.value {
             group.addFileReference(allObjects.createReference(value: framework))
         }
@@ -151,12 +191,12 @@ public extension PBXProject {
         return targets.first(where: { $0.value?.name == name })?.value
     }
     
-    func newFrameworkReference(path : String, sourceTree : SourceTree = .relativeTo(.sdkRoot)) -> PBXFileReference {
+    func newFrameworkReference(path : String, sourceTree : SourceTree = .relativeTo(.sdkRoot), fileType : PBXFileType = .framework) -> PBXFileReference {
         let framework = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
         framework.path = path
         framework.name = path.substring(fromLast: "/") ?? path
         framework.sourceTree = sourceTree
-        framework.lastKnownFileType = .framework
+        framework.lastKnownFileType = fileType
         return framework
     }
 
@@ -196,15 +236,21 @@ public extension PBXGroup {
 
 public extension PBXTarget {
     
-    func buildPhase<T : PBXBuildPhase>(of type : T.Type) -> T {
+    public typealias BuildPhaseAppend = (inout [Reference<PBXBuildPhase>], Reference<PBXBuildPhase>)->()
+    
+    func buildPhase<T : PBXBuildPhase>(of type : T.Type, append : BuildPhaseAppend? = nil) -> T {
         return buildPhases.first(where: { $0.value is T })?.value as? T ??
-               addBuildPhase(type: T.self)
+               addBuildPhase(type: T.self, append: append)
     }
     
-    func addBuildPhase<T : PBXBuildPhase>(type : T.Type) -> T {
+    func addBuildPhase<T : PBXBuildPhase>(type : T.Type, append : BuildPhaseAppend? = nil) -> T {
         let phase = type.init(emptyObjectWithId: Guid.random, allObjects: allObjects)
         let reference = allObjects.createReference(value: phase) as Reference<PBXBuildPhase>
-        buildPhases.append(reference)
+        if let append = append {
+            append(&buildPhases, reference)
+        } else {
+            buildPhases.append(reference)
+        }
         return phase
     }
     
