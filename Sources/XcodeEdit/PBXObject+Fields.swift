@@ -23,10 +23,10 @@ internal extension Dictionary where Key == String {
 
   func id(_ key: String) throws -> Guid {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? String else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return Guid(value)
@@ -37,7 +37,7 @@ internal extension Dictionary where Key == String {
       return nil
     }
     guard let value = val as? String else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return Guid(value)
@@ -45,10 +45,10 @@ internal extension Dictionary where Key == String {
 
   func ids(_ key: String) throws -> [Guid] {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? [String] else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value.map(Guid.init)
@@ -56,10 +56,10 @@ internal extension Dictionary where Key == String {
 
   func bool(_ key: String) throws -> Bool {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? String else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     switch value {
@@ -70,7 +70,7 @@ internal extension Dictionary where Key == String {
       return true
 
     default:
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
   }
 
@@ -79,7 +79,7 @@ internal extension Dictionary where Key == String {
       return nil
     }
     guard let value = val as? String else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value
@@ -87,10 +87,10 @@ internal extension Dictionary where Key == String {
 
   func string(_ key: String) throws -> String {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? String else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value
@@ -98,10 +98,10 @@ internal extension Dictionary where Key == String {
 
   func strings(_ key: String) throws -> [String] {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? [String] else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value
@@ -109,10 +109,10 @@ internal extension Dictionary where Key == String {
 
   func fields(_ key: String) throws -> Fields {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? Fields else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value
@@ -120,10 +120,10 @@ internal extension Dictionary where Key == String {
 
   func fieldsArray(_ key: String) throws -> [Fields] {
     guard let val = self[key] else {
-      throw AllObjectsError.fieldMissing(key: key)
+        throw AllObjectsError.fieldMissing(obj: self, key: key)
     }
     guard let value = val as? [Fields] else {
-      throw AllObjectsError.wrongType(key: key)
+        throw AllObjectsError.wrongType(obj: self, key: key)
     }
 
     return value

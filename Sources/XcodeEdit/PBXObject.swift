@@ -142,7 +142,7 @@ public class PBXBuildFile : PBXProjectItem {
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
-  required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
+  public required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
       super.init(emptyObjectWithId: id, allObjects: allObjects)
   }
     
@@ -313,13 +313,13 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
     public var productName: String
     public var buildPhases: [Reference<PBXBuildPhase>]
     public var dependencies: [Reference<PBXTargetDependency>]
-    public var productType : String
+    public var productType : String?
 
     public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
         self.buildConfigurationList = allObjects.createReference(id: try fields.id("buildConfigurationList"))
         self.name = try fields.string("name")
         self.productName = try fields.string("productName")
-        self.productType = try fields.string("productType")
+        self.productType = fields["productType"] as? String
         self.buildPhases = allObjects.createReferences(ids: try fields.ids("buildPhases"))
         self.dependencies = allObjects.createReferences(ids: try fields.ids("dependencies"))
         try super.init(id: id, fields: fields, allObjects: allObjects)
@@ -457,7 +457,7 @@ public class PBXReference : PBXContainerItem {
     self.fileEncoding = fields["fileEncoding"] as? Int
     let sourceTreeString = try fields.string("sourceTree")
     guard let sourceTree = SourceTree(rawValue: sourceTreeString) else {
-      throw AllObjectsError.wrongType(key: sourceTreeString)
+        throw AllObjectsError.wrongType(obj: fields, key: sourceTreeString)
     }
     self.sourceTree = sourceTree
 

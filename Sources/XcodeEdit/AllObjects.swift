@@ -9,9 +9,9 @@
 import Foundation
 
 public enum AllObjectsError: Error {
-  case fieldMissing(key: String)
-  case wrongType(key: String)
-  case objectMissing(id: Guid)
+  case fieldMissing(obj : Fields, key: String)
+  case wrongType(obj : Fields, key: String)
+  case objectMissing(obj : Fields, id: Guid)
 }
 
 public enum ReferenceError: Error {

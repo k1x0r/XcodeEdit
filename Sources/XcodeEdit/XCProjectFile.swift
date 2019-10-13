@@ -74,7 +74,7 @@ public class XCProjectFile {
   private init(xcodeprojURL : URL, fields: Fields, format: PropertyListSerialization.PropertyListFormat, ignoreReferenceErrors: Bool = false) throws {
     self.xcodeprojURL = xcodeprojURL
     guard let objects = fields["objects"] as? [String: Fields] else {
-      throw AllObjectsError.wrongType(key: "objects")
+        throw AllObjectsError.wrongType(obj: fields, key: "objects")
     }
 
     for (key, obj) in objects {
@@ -83,7 +83,7 @@ public class XCProjectFile {
 
     let rootObjectId = Guid(try fields.string("rootObject"))
     guard let projectFields = objects[rootObjectId.value] else {
-      throw AllObjectsError.objectMissing(id: rootObjectId)
+        throw AllObjectsError.objectMissing(obj: objects, id: rootObjectId)
     }
 
     guard let project = allObjects.objects[rootObjectId] as? PBXProject else {
@@ -91,7 +91,7 @@ public class XCProjectFile {
     }
         // = try PBXProject(id: rootObjectId, fields: projectFields, allObjects: allObjects)
     guard let mainGroup = project.mainGroup.value else {
-      throw AllObjectsError.objectMissing(id: project.mainGroup.id)
+        throw AllObjectsError.objectMissing(obj: [:], id: project.mainGroup.id)
     }
 
     if !ignoreReferenceErrors {
@@ -117,6 +117,10 @@ public class XCProjectFile {
     return String(last[..<range.lowerBound])
   }
   
+    public func addHeaderFiles() throws {
+        try project.addHeaderFiles(rootPath: xcodeprojURL.deletingLastPathComponent())
+    }
+    
     public func addXibsAndStoryboards() throws {
         try project.addXibsAndStoryboards(rootPath: xcodeprojURL.deletingLastPathComponent())
     }

@@ -10,7 +10,44 @@ import k2Utils
 
 public extension PBXProject {
     
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings"]
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer"]
+    static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
+
+    
+    func addHeaderFiles(rootPath : URL) throws {
+        print("Adding xibs and storyboards with root url: \(rootPath)")
+        let groups : [PBXGroup] = allObjects.objects.compactMap({
+            $1 as? PBXGroup
+        })
+
+        for group in groups {
+            let path = allObjects.fullFilePaths[group.id]
+            guard let name = group.name,
+                let url = path?.url(with: { _ in rootPath }) else {
+                    continue
+            }
+            let directoryFiles = try FileManager.default.contentsOfDirectory(atPath: url.path)
+            let resourceFiles = directoryFiles.filter {
+                guard let ext = $0.substring(fromLast: ".") else { return false }
+                return Me.knownHeaderTypes.contains(ext)
+            }
+            guard !resourceFiles.isEmpty else {
+                continue
+            }
+            for fileName in resourceFiles {
+                guard !group.children.contains(where: { $0.value?.path == fileName }) else {
+                    continue
+                }
+
+                let reference = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                reference.path = fileName
+                reference.fileEncoding = 4
+                group.addFileReference(allObjects.createReference(value: reference))
+            }
+            
+            print("Found files: \(resourceFiles)")
+        }
+    }
     
     // TODO remove root path
     func addXibsAndStoryboards(rootPath : URL) throws {
@@ -18,10 +55,7 @@ public extension PBXProject {
         let groups : [PBXGroup] = allObjects.objects.compactMap({
             $1 as? PBXGroup
         })
-//        let groupPaths : [(String?, Path?)] = groups.map({
-//            return ($0.name, allObjects.fullFilePaths[$0.id])
-//        })
-//        print("Groups: \(groupPaths)")
+
         for group in groups {
             let path = allObjects.fullFilePaths[group.id]
             guard let name = group.name,
