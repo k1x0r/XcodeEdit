@@ -74,7 +74,7 @@ public class PBXProject : PBXContainer {
   public var mainGroup: Reference<PBXGroup>
   public var targets: [Reference<PBXTarget>]
   public var projectReferences: [ProjectReference]
-  public var groups : [Reference<PBXGroup>]
+  public var groups : [Reference<PBXGroup>]     // Can work not correct...
     
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     self.developmentRegion = try fields.string("developmentRegion")
@@ -306,6 +306,8 @@ public class XCBuildConfiguration : PBXBuildStyle {
     
 }
 
+let HeaderSearchPaths = "HEADER_SEARCH_PATHS"
+
 public /* abstract */ class PBXTarget : PBXProjectItem {
 
     public var buildConfigurationList: Reference<XCConfigurationList>
@@ -344,6 +346,27 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
         fields["productType"] = productType
         fields["buildConfigurationList"] = buildConfigurationList.id.value
         fields["dependencies"] = dependencies.map { $0.id.value }
+    }
+    
+    public func fixSpmHeaderSearchPath() {
+        // patch SPM bug. Going easy way, because Apple is going to fix this bug according to the ticket...
+        let buildConfigsList = buildConfigurationList.value!
+        for configRef in buildConfigsList.buildConfigurations {
+            let config = configRef.value!
+            guard let headerSearchPaths = config.buildSettings[HeaderSearchPaths] as? [String] else {
+                continue
+            }
+            let publicHeadersPath = headerSearchPaths[1].substring(toLast: "/")!
+            let patchedHeaderSearchPaths : [String] = headerSearchPaths.map {
+                if $0.starts(with: "$") {
+                    return $0
+                } else {
+                    return publicHeadersPath + "/" + $0
+                }
+            }
+            config.buildSettings[HeaderSearchPaths] = patchedHeaderSearchPaths
+//            print("build settings: \(config.buildSettings)")
+        }
     }
 
 }

@@ -14,6 +14,15 @@ public extension PBXProject {
     static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
 
     
+    func groupWithPath(_ path : [String]) -> PBXGroup {
+        var group = mainGroup.value!
+        for pathElement in path {
+            let ref = group.group(with: pathElement)
+            group = ref.value!
+        }
+        return group
+    }
+    
     func addHeaderFiles(rootPath : URL) throws {
         print("Adding xibs and storyboards with root url: \(rootPath)")
         let groups : [PBXGroup] = allObjects.objects.compactMap({
@@ -252,7 +261,7 @@ public extension PBXGroup {
     
     func group(with name: String, sourceTree : SourceTree = .group) -> Reference<PBXGroup> {
         let group : Reference<PBXGroup>
-        if let _group = subGroups.first(where: { $0.value?.path == name }) {
+        if let _group = subGroups.first(where: { let val = $0.value!; return val.path == name || val.name == name }) {
             group = _group
         } else {
             let newGroup = PBXGroup(emptyObjectWithId: Guid.random, allObjects: allObjects)

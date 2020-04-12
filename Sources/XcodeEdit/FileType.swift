@@ -35,6 +35,7 @@ public enum PBXFileType : String {
     case xcDataModel            = "wrapper.xcdatamodel"
     case localizableStrings     = "file.strings"
     case systemLibrary          = "sourcecode.text-based-dylib-definition"
+    case dylib                  = "compiled.mach-o.dylib"
 }
 
 let fileTypeDictionary : [String : PBXFileType] = {
