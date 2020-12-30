@@ -575,19 +575,30 @@ public class PBXGroup : PBXReference {
     }
   }
     
-    public func addChildGroup(_ groupRef: Reference<PBXGroup>) {
+  @inlinable public func addChildGroup(_ groupRef: Reference<PBXGroup>) {
         let reference = Reference<PBXReference>(allObjects: groupRef.allObjects, id: groupRef.id)
         children.append(reference)
     }
 
   // Custom function for R.swift
-  public func addFileReference(_ fileReference: Reference<PBXFileReference>) {
+  @inlinable public func addFileReference(_ fileReference: Reference<PBXFileReference>) {
     if fileRefs.contains(fileReference) { return }
     let reference = Reference<PBXReference>(allObjects: fileReference.allObjects, id: fileReference.id)
     children.append(reference)
   }
  
-    
+    @inlinable public func setPath(path : String, relativeTo: SourceTreeFolder) {
+        self.path = path
+        self.sourceTree = .relativeTo(relativeTo)
+        allObjects.fullFilePaths[id] = .relativeTo(relativeTo, path)
+    }
+
+    @inlinable public func setPath(absolutePath : String) {
+        self.path = path
+        self.sourceTree = .absolute
+        allObjects.fullFilePaths[id] = .absolute(absolutePath)
+    }
+
     public override func applyChanges() {
         super.applyChanges()
         fields["children"] = children.map { $0.id.value }

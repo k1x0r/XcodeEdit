@@ -76,7 +76,7 @@ public class XCProjectFile {
     guard let objects = fields["objects"] as? [String: Fields] else {
         throw AllObjectsError.wrongType(obj: fields, key: "objects")
     }
-
+    allObjects.projectUrl = xcodeprojURL
     for (key, obj) in objects {
       allObjects.objects[Guid(key)] = try AllObjects.createObject(Guid(key), fields: obj, allObjects: allObjects)
     }
@@ -117,12 +117,12 @@ public class XCProjectFile {
     return String(last[..<range.lowerBound])
   }
   
-    public func addHeaderFiles() throws {
-        try project.addHeaderFiles(rootPath: xcodeprojURL.deletingLastPathComponent())
+    @inlinable public func addHeaderFiles() throws {
+        try project.addHeaderFiles()
     }
     
-    public func addXibsAndStoryboards() throws {
-        try project.addXibsAndStoryboards(rootPath: xcodeprojURL.deletingLastPathComponent())
+    @inlinable public func addXibsAndStoryboards() throws {
+        try project.addXibsAndStoryboards()
     }
     
   private func paths(_ current: PBXGroup, prefix: String) -> [Guid: Path] {

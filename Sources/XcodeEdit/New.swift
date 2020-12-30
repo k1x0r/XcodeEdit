@@ -8,14 +8,10 @@
 import Foundation
 import k2Utils
 
-public extension PBXProject {
-    
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer"]
-    static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
-
+public extension PBXGroup {
     
     func groupWithPath(_ path : [String]) -> PBXGroup {
-        var group = mainGroup.value!
+        var group = self
         for pathElement in path {
             let ref = group.group(with: pathElement)
             group = ref.value!
@@ -23,7 +19,40 @@ public extension PBXProject {
         return group
     }
     
-    func addHeaderFiles(rootPath : URL) throws {
+    @available(OSX 10.11, *)
+    func addChildDirectories() {
+        guard let fullPath = allObjects.fullFilePaths[id] else {
+            print("WARNING: Group \(self.name ?? "-") \(self.path ?? "-") doesn't have full file path (look for the message in source code to understand the meaning)")
+            return
+        }
+        let url = fullPath.url(with: { _ in allObjects.projectUrl.deletingLastPathComponent() })
+        let directoryFiles = try! FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+        for dir in directoryFiles {
+            guard dir.hasDirectoryPath else {
+                continue
+            }
+            let groupName = dir.lastPathComponent
+            let child = group(with: groupName).value!
+            switch fullPath {
+                case .absolute(let path):
+                    child.setPath(absolutePath: path + "/" + groupName)
+                case .relativeTo(let sourceTreeFolder, let path):
+                    child.setPath(path: path + "/" + groupName , relativeTo: sourceTreeFolder)
+            }
+            child.addChildDirectories()
+        }
+    }
+    
+}
+
+public extension PBXProject {
+    
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer"]
+    static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
+
+    
+    func addHeaderFiles() throws {
+        let rootPath = allObjects.projectUrl.deletingLastPathComponent()
         print("Adding xibs and storyboards with root url: \(rootPath)")
         let groups : [PBXGroup] = allObjects.objects.compactMap({
             $1 as? PBXGroup
@@ -59,7 +88,8 @@ public extension PBXProject {
     }
     
     // TODO remove root path
-    func addXibsAndStoryboards(rootPath : URL) throws {
+    func addXibsAndStoryboards() throws {
+        let rootPath = allObjects.projectUrl.deletingLastPathComponent()
         print("Adding xibs and storyboards with root url: \(rootPath)")
         let groups : [PBXGroup] = allObjects.objects.compactMap({
             $1 as? PBXGroup

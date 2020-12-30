@@ -1,4 +1,5 @@
-// swift-tools-version:4.0
+// swift-tools-version:5.2
+
 import PackageDescription
 
 let package = Package(
@@ -7,11 +8,10 @@ let package = Package(
     .library(name: "XcodeEdit", targets: ["XcodeEdit"]),
   ],
   dependencies: [
-    .package(url: "https://git.lan/k2utils.git", .branch("master")),
+    .package(name: "k2Utils", url: "https://git.lan/k2utils.git", .branch("master")),
   ],
   targets: [
     .target(name: "XcodeEdit", dependencies: ["k2Utils"]),
-  ],
-  swiftLanguageVersions: [4]
+  ]
 )
 

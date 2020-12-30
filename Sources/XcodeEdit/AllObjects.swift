@@ -80,7 +80,8 @@ public class AllObjects {
   public var objects: [Guid: PBXObject] = [:]
   public var fullFilePaths: [Guid: Path] = [:]
   public var refCounts: [Guid: Int] = [:]
-
+  public var projectUrl = URL(fileURLWithPath: "")
+    
   public func createReferences<Value>(ids: [Guid]) -> [Reference<Value>] {
     return ids.map(createReference)
   }
