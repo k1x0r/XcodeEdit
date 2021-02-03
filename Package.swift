@@ -8,7 +8,7 @@ let package = Package(
     .library(name: "XcodeEdit", targets: ["XcodeEdit"]),
   ],
   dependencies: [
-    .package(name: "k2Utils", url: "https://git.lan/k2utils.git", .branch("master")),
+    .package(name: "k2Utils", url: "https://github.com/k1x0r/k2utils.git", .branch("master")),
   ],
   targets: [
     .target(name: "XcodeEdit", dependencies: ["k2Utils"]),
