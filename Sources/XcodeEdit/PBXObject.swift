@@ -337,6 +337,20 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
         super.init(emptyObjectWithId: id, allObjects: allObjects)
     }
     
+    public func containsRefernce(_ ref: PBXReference) -> Bool {
+        return buildPhases.contains(where: { bref in
+            guard let phase = bref.value else {
+                return false
+            }
+            return phase.files.contains { bfileRef -> Bool in
+                guard let buildFile = bfileRef.value else {
+                    return false
+                }
+                return buildFile.fileRef?.value?.id == ref.id
+            }
+        })
+    }
+    
     public override func applyChanges() {
         super.applyChanges()
 
@@ -548,6 +562,7 @@ public class PBXReferenceProxy : PBXReference {
 }
 
 public class PBXGroup : PBXReference {
+    
   public var children: [Reference<PBXReference>]
 
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {

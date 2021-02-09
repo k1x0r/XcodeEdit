@@ -45,9 +45,32 @@ public extension PBXGroup {
     
 }
 
+public extension Set where Element == String {
+    
+    static let kMainFileTypes : Set<String> = ["storyboard", "xib"]
+    
+    var groupFileName : String? {
+        let mainFile : String
+        if let firstEl = first(where: {
+            guard let ext = $0.substring(fromLast: ".") else {
+                return false
+            }
+            return Self.kMainFileTypes.contains(ext)
+        }) {
+            mainFile = firstEl
+        } else if let firstEl = first {
+            mainFile = firstEl
+        } else {
+            return nil
+        }
+        return mainFile.substring(fromLast: "/") ?? mainFile
+    }
+    
+}
+
 public extension PBXProject {
     
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer"]
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer", "ttf", "colorhex", "xcassets"]
     static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
 
     
@@ -94,12 +117,20 @@ public extension PBXProject {
         let groups : [PBXGroup] = allObjects.objects.compactMap({
             $1 as? PBXGroup
         })
-
+        let names = groups.compactMap({ $0.name })
+        print("Found groups: \(names)")
         for group in groups {
+            
+
+            guard let firstObject = group.fileRefs.first?.value,
+                  let targ = targets.first(where: { target -> Bool in
+                  target.value?.containsRefernce(firstObject) ?? false
+            })?.value else {
+                continue
+            }
             let path = allObjects.fullFilePaths[group.id]
             guard let name = group.name,
-                  let url = path?.url(with: { _ in rootPath }),
-                  let targ = target(named: name.substring(toLast: " ") ?? name) else {
+                  let url = path?.url(with: { _ in rootPath }) else {
                 continue
             }
             let directoryFiles = try FileManager.default.contentsOfDirectory(atPath: url.path)
@@ -107,49 +138,63 @@ public extension PBXProject {
                 guard let ext = $0.substring(fromLast: ".") else { return false }
                 return Me.knownTypes.contains(ext)
             }
-            guard !resourceFiles.isEmpty else {
-                continue
-            }
             let localizedDirectories = directoryFiles.filter {
                 guard let ext = $0.substring(fromLast: ".") else { return false }
                 return ext == "lproj"
             }
-            var localized : [String : Set<String>] = [:]
-            for dir in localizedDirectories {
-                let localizedFiles = try FileManager.default.contentsOfDirectory(atPath: url.appendingPathComponent(dir).path)
-                for file in localizedFiles {
-                    guard let ext = file.substring(fromLast: "."), Me.knownTypes.contains(ext) else {
-                        continue
-                    }
-                    localized[file, default: []].insert(dir)
-                }
+            guard !resourceFiles.isEmpty || !localizedDirectories.isEmpty else {
+                continue
             }
-            
+            print("Group '\(group.path ?? "")'")
             print("Found files: \(resourceFiles)")
             let resourcesPhase = targ.buildPhase(of: PBXResourcesBuildPhase.self)
-            resourcesPhase.files.append(contentsOf: resourceFiles.compactMap { fileName in
-                guard !group.fileRefs.contains(where: { $0.value?.path == fileName }) else {
+            resourcesPhase.files.append(contentsOf: resourceFiles.compactMap { filePath in
+                guard !group.fileRefs.contains(where: { $0.value?.path == filePath }) else {
                     return nil
                 }
                 let reference = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
-                reference.path = fileName
+                reference.name = filePath.substring(fromLast: "/")
+                reference.path = filePath
                 reference.fileEncoding = 4
                 group.addFileReference(allObjects.createReference(value: reference))
                 let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
                 file.fileRef = allObjects.createReference(value: reference)
                 return allObjects.createReference(value: file)
             })
-            resourcesPhase.files.append(contentsOf: localized.map({ (fileName, localizations) in
+            var localized : [String : Set<String>] = [:]
+            for dir in localizedDirectories {
+                let localizedFiles = try FileManager.default.contentsOfDirectory(atPath: url.appendingPathComponent(dir).path)
+                for file in localizedFiles {
+                    guard let name = file.substring(toLast: "."),
+                          let ext = file.substring(fromLast: "."), Me.knownTypes.contains(ext) else {
+                        continue
+                    }
+                    localized[name, default: []].insert(dir + "/" + file)
+                }
+            }
+            resourcesPhase.files.append(contentsOf: localized.compactMap({ (name, files) in
+                guard let groupName = files.groupFileName else {
+                    return nil
+                }
                 let variantGroup = PBXVariantGroup(emptyObjectWithId: Guid.random, allObjects: allObjects)
-                variantGroup.name = fileName
+                variantGroup.name = groupName
                 variantGroup.sourceTree = .group
-                variantGroup.children = localizations.map({ localization in
+                let children = files.map({ relativePath -> PBXFileReference in
                     let fileRef = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
                     fileRef.sourceTree = .group
-                    fileRef.path = localization + "/" + fileName
-                    fileRef.name = localization.substring(toLast: ".")
-                    return allObjects.createReference(value: fileRef)
+                    fileRef.path = relativePath
+                    fileRef.name = relativePath.substring(toFirst: ".") ?? "Empty Name?!"
+                    return fileRef
+                }).sorted(by: { (ref1, ref2) -> Bool in
+                    if let path = ref1.path, path.contains(groupName) {
+                        return true
+                    } else {
+                        return ref1.name < ref2.name
+                    }
+                }).map({
+                    allObjects.createReference(value: $0) as Reference<PBXReference>
                 })
+                variantGroup.children = children
                 let variantRef : Reference<PBXReference> = allObjects.createReference(value: variantGroup)
                 group.children.append(variantRef)
                 let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
