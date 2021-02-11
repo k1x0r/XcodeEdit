@@ -8,6 +8,12 @@
 import Foundation
 import k2Utils
 
+public extension PBXReference {
+    var isSimpleGroup : Bool {
+        return self is PBXGroup && !(self is PBXVariantGroup)
+    }
+}
+
 public extension PBXGroup {
     
     func groupWithPath(_ path : [String]) -> PBXGroup {
@@ -70,17 +76,14 @@ public extension Set where Element == String {
 
 public extension PBXProject {
     
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "cer", "ttf", "colorhex", "xcassets"]
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "bundle", "cer", "ttf", "colorhex", "xcassets"]
     static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
 
     
     func addHeaderFiles() throws {
         let rootPath = allObjects.projectUrl.deletingLastPathComponent()
         print("Adding xibs and storyboards with root url: \(rootPath)")
-        let groups : [PBXGroup] = allObjects.objects.compactMap({
-            $1 as? PBXGroup
-        })
-
+        let groups : [PBXGroup] = allObjects.objectsOfType()
         for group in groups {
             let path = allObjects.fullFilePaths[group.id]
             guard let name = group.name,
@@ -110,13 +113,10 @@ public extension PBXProject {
         }
     }
     
-    // TODO remove root path
     func addXibsAndStoryboards() throws {
         let rootPath = allObjects.projectUrl.deletingLastPathComponent()
         print("Adding xibs and storyboards with root url: \(rootPath)")
-        let groups : [PBXGroup] = allObjects.objects.compactMap({
-            $1 as? PBXGroup
-        })
+        let groups : [PBXGroup] = allObjects.objectsOfType()
         let names = groups.compactMap({ $0.name })
         print("Found groups: \(names)")
         for group in groups {
@@ -204,7 +204,36 @@ public extension PBXProject {
         }
     }
     
-    public enum FrameworkType {
+    func sortGroups() {
+        let groups : [PBXGroup] = allObjects.objectsOfType()
+        for group in groups {
+            guard group.isSimpleGroup else {
+                continue
+            }
+            group.children.sort { (c1, c2) -> Bool in
+                guard let r1 = c1.value, let p1 = r1.path ?? r1.name else {
+                    return true
+                }
+                guard let r2 = c2.value, let p2 = r2.path ?? r2.name else {
+                    return false
+                }
+                if r1.isSimpleGroup && r2.isSimpleGroup {
+                    return p1.lastPathComponent < p2.lastPathComponent
+                } else if r1.isSimpleGroup {
+                    return true
+                } else if r2.isSimpleGroup {
+                    return false
+                } else {
+                    return p1.lastPathComponent < p2.lastPathComponent
+                }
+            }
+            group.applyChanges()
+            let names = group.children.compactMap({ $0.value?.path })
+            print("Sorted group: \(names)")
+        }
+    }
+    
+    enum FrameworkType {
         case library
         case embeddedBinary
         case both

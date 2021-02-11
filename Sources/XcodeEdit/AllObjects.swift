@@ -82,10 +82,17 @@ public class AllObjects {
   public var refCounts: [Guid: Int] = [:]
   public var projectUrl = URL(fileURLWithPath: "")
     
+    
+  public func objectsOfType<T>() -> [T] {
+    return objects.compactMap({
+        $1 as? T
+    })
+  }
+
   public func createReferences<Value>(ids: [Guid]) -> [Reference<Value>] {
     return ids.map(createReference)
   }
-
+    
   public func createReferences<Value>() -> [Reference<Value>] where Value : PBXObject {
     return objects.compactMap { (key, value) -> Reference<Value>? in
         guard value is Value else {
