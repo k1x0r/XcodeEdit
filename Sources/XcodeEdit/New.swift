@@ -268,6 +268,7 @@ public extension PBXProject {
         
     }
     
+    
     func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targets: [(FrameworkType, PBXTarget)]) throws{
         if framework.lastKnownFileType == nil {
            framework.lastKnownFileType = .framework
@@ -275,11 +276,13 @@ public extension PBXProject {
         if let group = groupRef?.value {
             group.addFileReference(allObjects.createReference(value: framework))
         }
-        
+        guard var suffix = framework.lastPathComponentOrName?.guidStyle else {
+            return
+        }
         for (frameworkType, target) in targets {
             switch frameworkType {
                 case .embeddedBinary, .both:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-EB-" + suffix), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     buildFile.settings = [
                         "ATTRIBUTES" : ["CodeSignOnCopy", "RemoveHeadersOnCopy"]
@@ -290,7 +293,7 @@ public extension PBXProject {
                         fallthrough
                     }
                 case .library:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-SL-" + suffix), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     let copyFilesPhase = target.buildPhase(of: PBXFrameworksBuildPhase.self)
                     copyFilesPhase.addBuildFile(allObjects.createReference(value: buildFile))

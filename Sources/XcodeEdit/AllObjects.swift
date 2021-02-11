@@ -19,6 +19,16 @@ public enum ReferenceError: Error {
   case orphanObject(type: String, id: Guid)
 }
 
+public extension String {
+    
+    static let kAllowedGuidCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890-")
+
+    var guidStyle : String {
+        return String(uppercased().replacingOccurrences(of: ".", with: "-").unicodeScalars.filter( { Self.kAllowedGuidCharacters.contains($0) }))
+    }
+    
+}
+
 public struct Guid : Hashable, Comparable {
   public let value: String
 

@@ -501,6 +501,10 @@ public class PBXReference : PBXContainerItem {
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
+    public var lastPathComponentOrName : String? {
+        return path?.lastPathComponent ?? name
+    }
+    
     required init(emptyObjectWithId id: Guid, allObjects: AllObjects) {
         sourceTree = .group
         super.init(emptyObjectWithId: id, allObjects: allObjects)
