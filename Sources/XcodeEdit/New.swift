@@ -257,9 +257,9 @@ public extension PBXProject {
 
     }
     
-    func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targetNames: [(FrameworkType, String)]) throws {
+    func addFramework(framework : PBXFileReference, group : PBXGroup, targetNames: [(FrameworkType, String)]) throws {
         
-        try addFramework(framework: framework, group: groupRef, targets: targetNames.map {
+        try addFramework(framework: framework, group: group, targets: targetNames.map {
             guard let targ = target(named: $0.1) else {
                 throw "Target with name: \"\($0)\" not found!".error()
             }
@@ -268,36 +268,40 @@ public extension PBXProject {
         
     }
     
+    static var buildFileCounter = 0
     
-    func addFramework(framework : PBXFileReference, group groupRef: Reference<PBXGroup>? = nil, targets: [(FrameworkType, PBXTarget)]) throws{
+    func addFramework(framework : PBXFileReference, group : PBXGroup, targets: [(FrameworkType, PBXTarget)]) throws{
         if framework.lastKnownFileType == nil {
            framework.lastKnownFileType = .framework
         }
-        if let group = groupRef?.value {
-            group.addFileReference(allObjects.createReference(value: framework))
-        }
-        guard var suffix = framework.lastPathComponentOrName?.guidStyle else {
+
+        group.addFileReference(allObjects.createReference(value: framework))
+        guard let suffix = framework.lastPathComponentOrName?.guidStyle else {
             return
         }
+    
         for (frameworkType, target) in targets {
             switch frameworkType {
                 case .embeddedBinary, .both:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-EB-" + suffix), allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-EB-" + suffix + "-\(Self.buildFileCounter)"), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     buildFile.settings = [
                         "ATTRIBUTES" : ["CodeSignOnCopy", "RemoveHeadersOnCopy"]
                     ]
                     let frameworksPhase = target.buildPhase(of: PBXCopyFilesBuildPhase.self)
                     frameworksPhase.addBuildFile(allObjects.createReference(value: buildFile))
+                    Self.buildFileCounter += 1
                     if frameworkType == .both {
                         fallthrough
                     }
                 case .library:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-SL-" + suffix), allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-SL-" + suffix + "-\(Self.buildFileCounter)"), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     let copyFilesPhase = target.buildPhase(of: PBXFrameworksBuildPhase.self)
                     copyFilesPhase.addBuildFile(allObjects.createReference(value: buildFile))
+                    Self.buildFileCounter += 1
             }
+            
         }
         
     }
@@ -366,13 +370,13 @@ public extension PBXGroup {
         return Set(fileRefs.filter({ $0.value?.lastKnownFileType == .framework }).map({ Reference<PBXReference>(allObjects: allObjects, id: $0.id) }))
     }
     
-    func group(with name: String, sourceTree : SourceTree = .group) -> Reference<PBXGroup> {
+    func group(with name: String, path : String? = nil, sourceTree : SourceTree = .group) -> Reference<PBXGroup> {
         let group : Reference<PBXGroup>
         if let _group = subGroups.first(where: { let val = $0.value!; return val.path == name || val.name == name }) {
             group = _group
         } else {
             let newGroup = PBXGroup(emptyObjectWithId: Guid.random, allObjects: allObjects)
-            newGroup.path = name
+            newGroup.path = path ?? name
             newGroup.name = name
             newGroup.sourceTree = sourceTree
             let newGroupRef = allObjects.createReference(value: newGroup)
@@ -386,7 +390,7 @@ public extension PBXGroup {
 
 public extension PBXTarget {
     
-    public typealias BuildPhaseAppend = (inout [Reference<PBXBuildPhase>], Reference<PBXBuildPhase>)->()
+    typealias BuildPhaseAppend = (inout [Reference<PBXBuildPhase>], Reference<PBXBuildPhase>)->()
     
     func buildPhase<T : PBXBuildPhase>(of type : T.Type, append : BuildPhaseAppend? = nil) -> T {
         return buildPhases.first(where: { $0.value is T })?.value as? T ??

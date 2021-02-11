@@ -129,8 +129,7 @@ public class AllObjects {
     refCounts[value.id, default: 0] += 1
 
     objects[value.id] = value
-    let ref: Reference<Value> = Reference(allObjects: self, id: value.id)
-    return ref
+    return Reference(allObjects: self, id: value.id)
   }
 
   public func removeReference<Value>(_ ref: Reference<Value>?) {
