@@ -121,10 +121,6 @@ public class XCProjectFile {
         try project.addHeaderFiles()
     }
     
-    @inlinable public func addXibsAndStoryboards() throws {
-        try project.addXibsAndStoryboards()
-    }
-    
   private func paths(_ current: PBXGroup, prefix: String) -> [Guid: Path] {
 
     var ps: [Guid: Path] = [:]

@@ -8,6 +8,15 @@
 import Foundation
 import k2Utils
 
+extension Int {
+    
+    @inlinable
+    mutating func inc() -> Int {
+        self += 1
+        return self
+    }
+}
+
 public extension PBXReference {
     var isSimpleGroup : Bool {
         return self is PBXGroup && !(self is PBXVariantGroup)
@@ -113,24 +122,103 @@ public extension PBXProject {
         }
     }
     
-    func addXibsAndStoryboards() throws {
+    static let k2genCopyResourcesPhaseName = "[k2gen] Copy resources"
+    
+    func addCopyResourcesScript(frameworkName : String,  to : [String]) {
+        let targets = to.compactMap { target(named: $0) }
+        for target in targets {
+            let scriptPhase = target.buildPhase(where: { (phase : PBXShellScriptBuildPhase) -> Bool in
+                phase.name == Self.k2genCopyResourcesPhaseName
+            })
+            scriptPhase.name = Self.k2genCopyResourcesPhaseName
+            scriptPhase.shellScript = """
+                cd "${TARGET_BUILD_DIR}/\(frameworkName)"
+                rm -rf "_CodeSignature"
+                rm Info.plist
+                cp -R "${TARGET_BUILD_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
+                """
+            scriptPhase.applyChanges()
+
+        }
+    }
+    
+    
+    static var xcAssetCounter = 0
+    static var xcAssetBfileCounter = 0
+
+    func addXcAssets(pathPrefix: String, spmAllObjects : AllObjects, k2genGroup : PBXGroup, to : [String]) {
+        let targets = to.compactMap { target(named: $0) }
+        let phases = targets.map { $0.buildPhase(of: PBXResourcesBuildPhase.self) }
+        for (_, path) in spmAllObjects.fullFilePaths {
+            let pathString = path.url(with: { _ in URL(fileURLWithPath: "/") }).path
+            guard pathString.lowercased().hasSuffix("xcassets") else {
+                continue
+            }
+            let name = pathString.lastPathComponent
+            let reference = PBXFileReference(emptyObjectWithId: Guid("FREF-ASSET-" + name.guidStyle + "-\(Self.xcAssetCounter.inc())" ), allObjects: allObjects)
+            reference.name = name
+            reference.path = pathPrefix + pathString
+            reference.sourceTree = .relativeTo(.sourceRoot)
+            reference.fileEncoding = 4
+            k2genGroup.children.append(allObjects.createReference(value: reference))
+            for copyFiles in phases {
+                let file = PBXBuildFile(emptyObjectWithId: Guid("BF-ASSET-" + name.guidStyle + "-\(Self.xcAssetBfileCounter.inc())" ), allObjects: allObjects)
+                file.fileRef = allObjects.createReference(value: reference)
+                copyFiles.files.append(allObjects.createReference(value: file))
+            }
+        }
+        k2genGroup.applyChanges()
+        for copyFiles in phases {
+            copyFiles.applyChanges()
+        }
+    }
+    
+    func addXibsAndStoryboardsToFrameworks() throws {
+        try addXibsAndStoryboards { (reference, group) -> (Reference<PBXBuildFile>?) in
+            group.children.append(allObjects.createReference(value: reference))
+            let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
+            file.fileRef = allObjects.createReference(value: reference)
+            return group.allObjects.createReference(value: file)
+        }
+    }
+    
+    func addXibsAndStoryboardsToGroups(resourceTarget targetName: String) throws {
+        guard let resourceTarget = target(named: targetName) else {
+            throw "Can't find target named \(targetName) for resources".error()
+        }
+        let resourcePhase = resourceTarget.buildPhase(of: PBXResourcesBuildPhase.self)
+        try addXibsAndStoryboards { (reference, group) -> (Reference<PBXBuildFile>?) in
+            group.children.append(allObjects.createReference(value: reference))
+            guard let isXcAsset = reference.lastPathComponentOrName?.hasSuffix("xcassets"), !isXcAsset else {
+                return nil
+            }
+            let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
+            file.fileRef = allObjects.createReference(value: reference)
+            resourcePhase.files.append(group.allObjects.createReference(value: file))
+            return nil
+        }
+        resourcePhase.applyChanges()
+        resourceTarget.deleteBuildPhases(where: { $0 is PBXSourcesBuildPhase })
+    }
+    
+    func addXibsAndStoryboards(iterator : (PBXReference, PBXGroup) -> (Reference<PBXBuildFile>?)) throws {
         let rootPath = allObjects.projectUrl.deletingLastPathComponent()
         print("Adding xibs and storyboards with root url: \(rootPath)")
         let groups : [PBXGroup] = allObjects.objectsOfType()
         let names = groups.compactMap({ $0.name })
         print("Found groups: \(names)")
         for group in groups {
-            
-
             guard let firstObject = group.fileRefs.first?.value,
                   let targ = targets.first(where: { target -> Bool in
                   target.value?.containsRefernce(firstObject) ?? false
             })?.value else {
                 continue
             }
-            let path = allObjects.fullFilePaths[group.id]
+            let groupDir = allObjects.fullFilePaths[group.id]
+
             guard let name = group.name,
-                  let url = path?.url(with: { _ in rootPath }) else {
+                  let url = groupDir?.url(with: { _ in rootPath }),
+                  let groupPath = groupDir?.url(with: { _ in URL(fileURLWithPath: "/") }) else {
                 continue
             }
             let directoryFiles = try FileManager.default.contentsOfDirectory(atPath: url.path)
@@ -155,11 +243,12 @@ public extension PBXProject {
                 let reference = PBXFileReference(emptyObjectWithId: Guid.random, allObjects: allObjects)
                 reference.name = filePath.substring(fromLast: "/")
                 reference.path = filePath
+                allObjects.fullFilePaths[reference.id] = .relativeTo(.sourceRoot, groupPath.appendingPathComponent(filePath).path)
                 reference.fileEncoding = 4
                 group.addFileReference(allObjects.createReference(value: reference))
                 let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
                 file.fileRef = allObjects.createReference(value: reference)
-                return allObjects.createReference(value: file)
+                return iterator(reference, group)
             })
             var localized : [String : Set<String>] = [:]
             for dir in localizedDirectories {
@@ -184,6 +273,8 @@ public extension PBXProject {
                     fileRef.sourceTree = .group
                     fileRef.path = relativePath
                     fileRef.name = relativePath.substring(toFirst: ".") ?? "Empty Name?!"
+                    allObjects.fullFilePaths[fileRef.id] = .relativeTo(.sourceRoot, groupPath.appendingPathComponent(relativePath).path)
+
                     return fileRef
                 }).sorted(by: { (ref1, ref2) -> Bool in
                     if let path = ref1.path, path.contains(groupName) {
@@ -195,11 +286,7 @@ public extension PBXProject {
                     allObjects.createReference(value: $0) as Reference<PBXReference>
                 })
                 variantGroup.children = children
-                let variantRef : Reference<PBXReference> = allObjects.createReference(value: variantGroup)
-                group.children.append(variantRef)
-                let buildFile = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
-                buildFile.fileRef = variantRef
-                return allObjects.createReference(value: buildFile)
+                return iterator(variantGroup, group)
             }))
         }
     }
@@ -283,23 +370,21 @@ public extension PBXProject {
         for (frameworkType, target) in targets {
             switch frameworkType {
                 case .embeddedBinary, .both:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-EB-" + suffix + "-\(Self.buildFileCounter)"), allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-EB-" + suffix + "-\(Self.buildFileCounter.inc())"), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     buildFile.settings = [
                         "ATTRIBUTES" : ["CodeSignOnCopy", "RemoveHeadersOnCopy"]
                     ]
                     let frameworksPhase = target.buildPhase(of: PBXCopyFilesBuildPhase.self)
                     frameworksPhase.addBuildFile(allObjects.createReference(value: buildFile))
-                    Self.buildFileCounter += 1
                     if frameworkType == .both {
                         fallthrough
                     }
                 case .library:
-                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-SL-" + suffix + "-\(Self.buildFileCounter)"), allObjects: allObjects)
+                    let buildFile = PBXBuildFile(emptyObjectWithId: Guid("BF-SL-" + suffix + "-\(Self.buildFileCounter.inc())"), allObjects: allObjects)
                     buildFile.fileRef = allObjects.createReference(value: framework)
                     let copyFilesPhase = target.buildPhase(of: PBXFrameworksBuildPhase.self)
                     copyFilesPhase.addBuildFile(allObjects.createReference(value: buildFile))
-                    Self.buildFileCounter += 1
             }
             
         }
@@ -370,6 +455,10 @@ public extension PBXGroup {
         return Set(fileRefs.filter({ $0.value?.lastKnownFileType == .framework }).map({ Reference<PBXReference>(allObjects: allObjects, id: $0.id) }))
     }
     
+    var childrenSet : Set<Reference<PBXReference>> {
+        return Set(fileRefs.map({ Reference<PBXReference>(allObjects: allObjects, id: $0.id) }))
+    }
+    
     func group(with name: String, path : String? = nil, sourceTree : SourceTree = .group) -> Reference<PBXGroup> {
         let group : Reference<PBXGroup>
         if let _group = subGroups.first(where: { let val = $0.value!; return val.path == name || val.name == name }) {
@@ -392,9 +481,26 @@ public extension PBXTarget {
     
     typealias BuildPhaseAppend = (inout [Reference<PBXBuildPhase>], Reference<PBXBuildPhase>)->()
     
+    @inlinable
+    func buildPhaseOptional<T : PBXBuildPhase>(of type : T.Type) -> T? {
+        return buildPhases.first(where: { $0.value is T })?.value as? T
+    }
+
+    @inlinable
     func buildPhase<T : PBXBuildPhase>(of type : T.Type, append : BuildPhaseAppend? = nil) -> T {
-        return buildPhases.first(where: { $0.value is T })?.value as? T ??
+        return buildPhaseOptional(of: T.self) ??
                addBuildPhase(type: T.self, append: append)
+    }
+    
+    @inlinable
+    func buildPhase<T : PBXBuildPhase>(where whereClosure: (T) -> Bool, append : BuildPhaseAppend? = nil) -> T {
+        return buildPhases.first(where: {
+            guard let phase = $0.value as? T else {
+                return false
+            }
+            return whereClosure(phase)
+        })?.value as? T ??
+        addBuildPhase(type: T.self, append: append)
     }
     
     func addBuildPhase<T : PBXBuildPhase>(type : T.Type, append : BuildPhaseAppend? = nil) -> T {
@@ -406,6 +512,28 @@ public extension PBXTarget {
             buildPhases.append(reference)
         }
         return phase
+    }
+    
+    func deleteBuildPhases(where whereClosure : (PBXBuildPhase) -> Bool ) {
+        var guids = [Guid]()
+        buildPhases = buildPhases.filter { buildPhaseRef in
+            guard let buildPhase = buildPhaseRef.value else {
+                return false
+            }
+            guard whereClosure(buildPhase) else {
+                return true
+            }
+            guids.append(buildPhaseRef.id)
+
+            for buildFileRef in buildPhase.files {
+                guids.append(buildFileRef.id)
+            }
+            return false
+        }
+        for guid in guids {
+            allObjects.objects.removeValue(forKey: guid)
+        }
+        applyChanges()
     }
     
     func deepClone() throws -> PBXTarget {

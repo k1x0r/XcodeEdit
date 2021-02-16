@@ -367,7 +367,7 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
         let buildConfigsList = buildConfigurationList.value!
         for configRef in buildConfigsList.buildConfigurations {
             let config = configRef.value!
-            guard let headerSearchPaths = config.buildSettings[HeaderSearchPaths] as? [String] else {
+            guard let headerSearchPaths = config.buildSettings[HeaderSearchPaths] as? [String], headerSearchPaths.count >= 2 else {
                 continue
             }
             let publicHeadersPath = headerSearchPaths[1].substring(toLast: "/")!
@@ -696,8 +696,8 @@ public enum Path: Equatable {
       return URL(fileURLWithPath: absolutePath).standardizedFileURL
 
     case let .relativeTo(sourceTreeFolder, relativePath):
-      let sourceTreeURL = urlForSourceTreeFolder(sourceTreeFolder)
-      return sourceTreeURL.appendingPathComponent(relativePath).standardizedFileURL
+      return urlForSourceTreeFolder(sourceTreeFolder)
+                .appendingPathComponent(relativePath).standardizedFileURL
     }
   }
 
