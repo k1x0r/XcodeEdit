@@ -132,10 +132,10 @@ public extension PBXProject {
             })
             scriptPhase.name = Self.k2genCopyResourcesPhaseName
             scriptPhase.shellScript = """
-                cd "${TARGET_BUILD_DIR}/\(frameworkName)"
+                cd "${BUILT_PRODUCTS_DIR}/\(frameworkName)"
                 rm -rf "_CodeSignature"
                 rm Info.plist
-                cp -R "${TARGET_BUILD_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
+                cp -R "${BUILT_PRODUCTS_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
                 """
             scriptPhase.applyChanges()
 
