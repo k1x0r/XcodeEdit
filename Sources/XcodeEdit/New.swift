@@ -85,7 +85,7 @@ public extension Set where Element == String {
 
 public extension PBXProject {
     
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "bundle", "cer", "ttf", "colorhex", "xcassets"]
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "bundle", "cer", "ttf", "otf", "colorhex", "xcassets", "json"]
     static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
 
     
@@ -135,7 +135,9 @@ public extension PBXProject {
                 cd "${BUILT_PRODUCTS_DIR}/\(frameworkName)"
                 rm -rf "_CodeSignature"
                 rm Info.plist
-                cp -R "${BUILT_PRODUCTS_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
+                rm Assets.car
+                chmod -R 733 "${BUILT_PRODUCTS_DIR}/\(frameworkName)/"
+                yes | cp -R "${BUILT_PRODUCTS_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
                 """
             scriptPhase.applyChanges()
 
@@ -189,9 +191,9 @@ public extension PBXProject {
         let resourcePhase = resourceTarget.buildPhase(of: PBXResourcesBuildPhase.self)
         try addXibsAndStoryboards { (reference, group) -> (Reference<PBXBuildFile>?) in
             group.children.append(allObjects.createReference(value: reference))
-            guard let isXcAsset = reference.lastPathComponentOrName?.hasSuffix("xcassets"), !isXcAsset else {
-                return nil
-            }
+//            guard let isXcAsset = reference.lastPathComponentOrName?.hasSuffix("xcassets"), !isXcAsset else {
+//                return nil
+//            }
             let file = PBXBuildFile(emptyObjectWithId: Guid.random, allObjects: allObjects)
             file.fileRef = allObjects.createReference(value: reference)
             resourcePhase.files.append(group.allObjects.createReference(value: file))

@@ -351,6 +351,34 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
         })
     }
     
+    public func modifyHeaderSearchPaths(_ modifyClosure : (inout [String]) -> ()) throws {
+        guard let buildConfigList = buildConfigurationList.value else {
+            throw "Can't find configuration list for '\(name)'".error()
+        }
+        for configRef in buildConfigList.buildConfigurations {
+            guard let config = configRef.value else {
+                continue
+            }
+            var headerSearchPaths = config.buildSettings["HEADER_SEARCH_PATHS"] as! [String]
+            modifyClosure(&headerSearchPaths)
+            config.buildSettings["HEADER_SEARCH_PATHS"] = headerSearchPaths
+        }
+    }
+    
+    public func add(headerSearchPaths searchPaths : [String]) throws {
+        guard let buildConfigList = buildConfigurationList.value else {
+            throw "Can't find configuration list for '\(name)'".error()
+        }
+        for configRef in buildConfigList.buildConfigurations {
+            guard let config = configRef.value else {
+                continue
+            }
+            var headerSearchPaths = config.buildSettings["HEADER_SEARCH_PATHS"] as! [String]
+            headerSearchPaths.append(contentsOf: searchPaths);
+            config.buildSettings["HEADER_SEARCH_PATHS"] = headerSearchPaths
+        }
+    }
+    
     public override func applyChanges() {
         super.applyChanges()
 
