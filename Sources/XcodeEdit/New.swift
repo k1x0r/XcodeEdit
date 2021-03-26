@@ -124,7 +124,7 @@ public extension PBXProject {
     
     static let k2genCopyResourcesPhaseName = "[k2gen] Copy resources"
     
-    func addCopyResourcesScript(frameworkName : String,  to : [String]) {
+    func addCopyResourcesScript(frameworkName : String,  to : [String], append: String = "") {
         let targets = to.compactMap { target(named: $0) }
         for target in targets {
             let scriptPhase = target.buildPhase(where: { (phase : PBXShellScriptBuildPhase) -> Bool in
@@ -132,10 +132,12 @@ public extension PBXProject {
             })
             scriptPhase.name = Self.k2genCopyResourcesPhaseName
             scriptPhase.shellScript = """
+                set -x
                 cd "${BUILT_PRODUCTS_DIR}/\(frameworkName)"
                 rm -rf "_CodeSignature"
                 rm Info.plist
                 rm Assets.car
+                \(append)
                 chmod -R 733 "${BUILT_PRODUCTS_DIR}/\(frameworkName)/"
                 yes | cp -R "${BUILT_PRODUCTS_DIR}/\(frameworkName)/." "${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/"
                 """
