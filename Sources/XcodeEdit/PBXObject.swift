@@ -373,7 +373,10 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
             guard let config = configRef.value else {
                 continue
             }
-            var headerSearchPaths = config.buildSettings["HEADER_SEARCH_PATHS"] as! [String]
+            var headerSearchPaths = [String]()
+            if let _headerSearchPaths = config.buildSettings["HEADER_SEARCH_PATHS"] as? [String] {
+                headerSearchPaths = _headerSearchPaths
+            }
             headerSearchPaths.append(contentsOf: searchPaths);
             config.buildSettings["HEADER_SEARCH_PATHS"] = headerSearchPaths
         }
@@ -432,13 +435,15 @@ public class PBXNativeTarget : PBXTarget {
 
 public class PBXTargetDependency : PBXProjectItem {
   public var targetProxy: Reference<PBXContainerItemProxy>?
-
+  public var target : String?
+    
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     do {
         self.targetProxy = allObjects.createReference(id: try fields.id("targetProxy"))
     } catch {
         self.targetProxy = nil
     }
+    target = fields["target"] as? String
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
