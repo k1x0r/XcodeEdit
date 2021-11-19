@@ -85,7 +85,7 @@ public extension Set where Element == String {
 
 public extension PBXProject {
     
-    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "bundle", "cer", "ttf", "otf", "colorhex", "xcassets", "json"]
+    static let knownTypes : Set<String> = ["storyboard", "xib", "strings", "bundle", "cer", "ttf", "otf", "colorhex", "xcassets", "json", "aiff", "wav", "mp3"]
     static let knownHeaderTypes : Set<String> = ["h", "hh", "hpp"]
 
     
