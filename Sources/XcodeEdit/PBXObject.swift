@@ -435,15 +435,14 @@ public class PBXNativeTarget : PBXTarget {
 
 public class PBXTargetDependency : PBXProjectItem {
   public var targetProxy: Reference<PBXContainerItemProxy>?
-  public var target : String?
+  public var target : Reference<PBXTarget>?
     
   public required init(id: Guid, fields: Fields, allObjects: AllObjects) throws {
     do {
         self.targetProxy = allObjects.createReference(id: try fields.id("targetProxy"))
+        self.target = allObjects.createReference(id: try fields.id("target"))
     } catch {
-        self.targetProxy = nil
     }
-    target = fields["target"] as? String
     try super.init(id: id, fields: fields, allObjects: allObjects)
   }
     
@@ -454,6 +453,9 @@ public class PBXTargetDependency : PBXProjectItem {
     public override func applyChanges() {
         super.applyChanges()
         fields["targetProxy"] = targetProxy?.id.value
+        if let target = target {
+            fields["target"] = target.id.value
+        }
     }
     
 }
