@@ -153,7 +153,8 @@ public extension PBXProject {
     func addXcAssets(pathPrefix: String, spmAllObjects : AllObjects, k2genGroup : PBXGroup, to : [String]) {
         let targets = to.compactMap { target(named: $0) }
         let phases = targets.map { $0.buildPhase(of: PBXResourcesBuildPhase.self) }
-        for (_, path) in spmAllObjects.fullFilePaths {
+        let paths = spmAllObjects.fullFilePaths.sorted(by: { $0.1 < $1.1 })
+        for (_, path) in paths {
             let pathString = path.url(with: { _ in URL(fileURLWithPath: "/") }).path
             guard pathString.lowercased().hasSuffix("xcassets") else {
                 continue
@@ -162,6 +163,7 @@ public extension PBXProject {
             let reference = PBXFileReference(emptyObjectWithId: Guid("FREF-ASSET-" + name.guidStyle + "-\(Self.xcAssetCounter.inc())" ), allObjects: allObjects)
             reference.name = name
             reference.path = pathPrefix + pathString
+            reference.lastKnownFileType = .assetCatalog
             reference.sourceTree = .relativeTo(.sourceRoot)
             reference.fileEncoding = 4
             k2genGroup.children.append(allObjects.createReference(value: reference))

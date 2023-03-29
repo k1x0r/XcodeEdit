@@ -44,8 +44,8 @@ public struct Guid : Hashable, Comparable {
     return lhs.value == rhs.value
   }
 
-  public var hashValue: Int {
-    return value.hashValue
+  public func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
   }
 
   static public func <(lhs: Guid, rhs: Guid) -> Bool {

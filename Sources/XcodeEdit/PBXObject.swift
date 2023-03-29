@@ -721,9 +721,23 @@ public enum SourceTreeFolder: String, Equatable {
   }
 }
 
-public enum Path: Equatable {
+public enum Path: Equatable, Comparable {
+    
   case absolute(String)
   case relativeTo(SourceTreeFolder, String)
+
+  public static func < (lhs: Path, rhs: Path) -> Bool {
+      switch (lhs, rhs) {
+      case (.absolute(let left), .absolute(let right)):
+          return left < right
+      case (.relativeTo(_, let leftPath), .relativeTo(_, let rightPath)):
+          return leftPath < rightPath
+      case (.absolute(_), .relativeTo(_, _)):
+          return false
+      case (.relativeTo(_, _), .absolute(_)):
+          return false
+      }
+  }
 
   public func url(with urlForSourceTreeFolder: (SourceTreeFolder) -> URL) -> URL {
     switch self {
@@ -752,3 +766,4 @@ public enum Path: Equatable {
     }
   }
 }
+
