@@ -384,7 +384,9 @@ public /* abstract */ class PBXTarget : PBXProjectItem {
     
     public override func applyChanges() {
         super.applyChanges()
-
+        if fields["buildRules"] == nil {
+            fields["buildRules"] = []
+        }
         fields["buildPhases"] = buildPhases.map { $0.id.value }
         fields["name"] = name
         fields["productName"] = productName
